@@ -60,9 +60,11 @@ namespace __01_yuv__ {
 
 		yuv2rgb_t();
 		yuv2rgb_t(double kR, double kB, bool bFullRange);
+		void ccvt(int16_t in[3], int16_t out[3]);
 	};
 
 	template<class T> int16_t V(T v);
+	template<class T> int16_t CLAMP(T v, T _min = 0, T _max = 255);
 
 	void invert_mat3x3(const double * src, double * dst);
 	void vec3_x_mat3x3(double* a, double* b, double* c);
@@ -70,10 +72,11 @@ namespace __01_yuv__ {
 	void mat3x3_x_vec3x1(double* a, double* b, double* c);
 	void mat3x3_x_vec3x1(double* a, int* b, double* c);
 	void mat3x3_x_vec3x1(int a[3][3], int b[3], int c[3]);
+	void ycbcr_limited_range(int a[3], double b[3]);
+	void ycbcr_full_range(int a[3], double b[3]);
 
 	struct ccvt_t {
 		yuv2rgb_t* YUV2RGB[YCBCR_BUTT];
-		rgb2yuv_t* RGB2YUV[YCBCR_BUTT];
 
 		ccvt_t();
 		~ccvt_t();
@@ -132,8 +135,25 @@ namespace __01_yuv__ {
 		u_b_factor = V((1-kB) / kU);
 	}
 
+	// |R|                        |y_factor      0       v_r_factor|   |Y-y_shift|
+	// |G| = 1/PRECISION_FACTOR * |y_factor  u_g_factor  v_g_factor| * |  U-128  |
+	// |B|                        |y_factor  u_b_factor      0     |   |  V-128  |
+	void yuv2rgb_t::ccvt(int16_t in[3], int16_t out[3]) {
+		int16_t y_ = in[0] - y_shift;
+		int16_t u_ = in[1] - 128;
+		int16_t v_ = in[2] - 128;
+
+		out[0] = CLAMP((y_factor * y_ + v_r_factor * v_) / PRECISION_FACTOR);
+		out[1] = CLAMP((y_factor * y_ + u_g_factor * u_ + v_g_factor * v_) / PRECISION_FACTOR);
+		out[2] = CLAMP((y_factor * y_ + u_b_factor * u_) / PRECISION_FACTOR);
+	}
+
 	template<class T> int16_t V(T v) {
 		return (int16_t)((v * PRECISION_FACTOR) + 0.5);
+	}
+
+	template<class T> int16_t CLAMP(T v, T _min, T _max) {
+		return (int16_t)((v < _min ? _min : v) > _max ? _max : v);
 	}
 
 	void invert_mat3x3(const double * src, double * dst)
@@ -213,25 +233,36 @@ namespace __01_yuv__ {
 		c[2] = a[2][0] * b[0] + a[2][1] * b[1] + a[2][2] * b[2];
 	}
 
+	void ycbcr_limited_range(int a[3], double b[3]) {
+		b[0] = (a[0] - 16.0) / (235.0 - 16.0);
+		b[1] = (a[1] - 16.0) / (240.0 - 16.0);
+		b[2] = (a[2] - 16.0) / (240.0 - 16.0);
+	}
+
+	void ycbcr_full_range(int a[3], double b[3]) {
+		b[0] = a[0] / 255.0;
+		b[1] = a[1] / 255.0;
+		b[2] = a[2] / 255.0;
+	}
+
 	ccvt_t::ccvt_t() {
 		memset(YUV2RGB, 0, sizeof(YUV2RGB));
-		memset(RGB2YUV, 0, sizeof(RGB2YUV));
 
 		// JPEG
 		{
 			yuv2rgb_t* param = new yuv2rgb_t();
-			param->y_shift = 0;
-			param->y_factor = V(1.0);
-			param->v_r_factor = V(1.402);
-			param->u_g_factor = -V(0.3441);
-			param->v_g_factor = -V(0.7141);
-			param->u_b_factor = V(1.772);
-
 			param->y_factor_f = 1.0;
 			param->v_r_factor_f = 1.402;
 			param->u_g_factor_f = -0.3441;
 			param->v_g_factor_f = -0.7141;
 			param->u_b_factor_f = 1.772;
+
+			param->y_shift = 0;
+			param->y_factor = V(param->y_factor_f);
+			param->v_r_factor = V(param->v_r_factor_f);
+			param->u_g_factor = V(param->u_g_factor_f);
+			param->v_g_factor = V(param->v_g_factor_f);
+			param->u_b_factor = V(param->u_b_factor_f);
 
 			YUV2RGB[YCBCR_JPEG] = param;
 		}
@@ -260,23 +291,65 @@ namespace __01_yuv__ {
 	ccvt_t::~ccvt_t() {
 		for(int i = 0;i < YCBCR_BUTT;i++) {
 			delete YUV2RGB[i];
-			delete RGB2YUV[i];
 		}
 	}
 
 	App::App(int argc, char **argv) : argc(argc), argv(argv) {
-		LOGD("%s(%d):", __FUNCTION__, __LINE__);
+		// LOGD("%s(%d):", __FUNCTION__, __LINE__);
 	}
 
 	App::~App() {
-		LOGD("%s(%d):", __FUNCTION__, __LINE__);
+		// LOGD("%s(%d):", __FUNCTION__, __LINE__);
 	}
 
 	int App::Run() {
 		int err;
 
 		switch(1) { case 1:
-			LOGD("HERE");
+			int yuv_0[] = {
+				0x3F,
+				0x66,
+				0xF0
+			};
+			LOGD("yuv_0: 0x%X(%d) 0x%X(%d) 0x%X(%d)",
+				yuv_0[0], yuv_0[0],
+				yuv_0[1], yuv_0[1],
+				yuv_0[2], yuv_0[2]);
+			double yuv_0_d[3];
+			ycbcr_limited_range(yuv_0, yuv_0_d);
+			LOGD("yuv_0_d: %.4f %.4f %.4f", yuv_0_d[0], yuv_0_d[1], yuv_0_d[2]);
+
+			int16_t yuv_0_s[3] = {
+				(int16_t)yuv_0[0],
+				(int16_t)yuv_0[1],
+				(int16_t)yuv_0[2],
+			};
+			int16_t rgb_0_s[3];
+			ccvt.YUV2RGB[YCBCR_709]->ccvt(yuv_0_s, rgb_0_s);
+			LOGD("rgb_0_s: %d %d %d", rgb_0_s[0], rgb_0_s[1], rgb_0_s[2]);
+
+			int yuv_1[] = {
+				0x36,
+				0x61,
+				0xFF
+			};
+			LOGD("yuv_1: 0x%X(%d) 0x%X(%d) 0x%X(%d)",
+				yuv_1[0], yuv_1[0],
+				yuv_1[1], yuv_1[1],
+				yuv_1[2], yuv_1[2]);
+			double yuv_1_d[3];
+			ycbcr_full_range(yuv_1, yuv_1_d);
+			LOGD("yuv_1_d: %.4f %.4f %.4f", yuv_1_d[0], yuv_1_d[1], yuv_1_d[2]);
+
+			int16_t yuv_1_s[3] = {
+				(int16_t)yuv_1[0],
+				(int16_t)yuv_1[1],
+				(int16_t)yuv_1[2],
+			};
+			int16_t rgb_1_s[3];
+			ccvt.YUV2RGB[YCBCR_709_FullRange]->ccvt(yuv_1_s, rgb_1_s);
+			LOGD("rgb_1_s: %d %d %d", rgb_1_s[0], rgb_1_s[1], rgb_1_s[2]);
+
 			err = 0;
 		}
 
@@ -287,14 +360,14 @@ namespace __01_yuv__ {
 using namespace __01_yuv__;
 
 int main(int argc, char *argv[]) {
-	LOGD("entering...");
+	// LOGD("entering...");
 
 	int err;
 	{
 		App app(argc, argv);
 		err = app.Run();
 
-		LOGD("leaving...");
+		// LOGD("leaving...");
 	}
 
 	return err;
