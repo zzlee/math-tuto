@@ -37,6 +37,7 @@ CFLAGS += \
 
 # All common dependent libraries
 LDFLAGS += \
-	-pthread
+-pthread
 
-COMMON_DIR := ../common
+COMMON_DIR := \
+../common

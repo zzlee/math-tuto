@@ -6,7 +6,7 @@
 
 #include <emmintrin.h>
 
-ZZ_INIT_LOG("01_yuv")
+ZZ_INIT_LOG("01_yuv");
 
 namespace __01_yuv__ {
 	enum {

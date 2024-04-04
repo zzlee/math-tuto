@@ -1,5 +1,6 @@
 SUBDIRS += \
-	samples/01_yuv
+	samples/01_yuv \
+	samples/02_hnet
 
 .PHONY: all
 all:
