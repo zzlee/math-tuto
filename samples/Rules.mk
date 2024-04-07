@@ -29,6 +29,11 @@ CFLAGS += --sysroot=$(TARGET_ROOTFS)
 LDFLAGS +=
 endif
 
+CPPFLAGS += \
+-Ofast
+CFLAGS += \
+-Ofast
+
 # All common header files
 CPPFLAGS += -std=c++11 \
 -I../common

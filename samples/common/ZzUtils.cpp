@@ -30,7 +30,7 @@ namespace ZzUtils {
 		int fd_stdin = 0; // stdin
 		int64_t now = _clk();
 		int64_t beg = now;
-		int64_t nTick = now * dur_den / dur_num;
+		int64_t nTick = now * dur_den / dur_num - 1;
 
 		LOGW("Wait for test...");
 		while(true) {
