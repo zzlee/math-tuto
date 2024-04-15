@@ -77,6 +77,20 @@ namespace __03_p210__ {
 #endif
 	}
 
+	inline void cvt_yuyv10c_2_yuyv16(uint40_m* src, uint16_t* dst) {
+		dst[0] = (uint16_t)(uint32_t(src->u8s[1] & 0x03) << 8) |
+			uint32_t((src->u8s[0] & 0xFF));
+
+		dst[1] = (uint16_t)(uint32_t(src->u8s[2] & 0x0F) << 6) |
+			uint32_t((src->u8s[1] & 0xFC) >> 2);
+
+		dst[2] = (uint16_t)(uint32_t(src->u8s[3] & 0x3F) << 4) |
+			uint32_t((src->u8s[2] & 0xF0) >> 4);
+
+		dst[3] = (uint16_t)(uint32_t(src->u8s[4] & 0xFF) << 2) |
+			uint32_t((src->u8s[3] & 0xC0) >> 6);
+	}
+
 	inline uint32_t tohl(uint32_t a) {
 		return (uint32_t)(((a & 0xFF000000) >> 24) | ((a & 0x00FF0000) >> 8) | ((a & 0x0000FF00) << 8) | ((a & 0x000000FF) << 24));
 	}
@@ -108,7 +122,7 @@ namespace __03_p210__ {
 
 		ZzUtils::TestLoop([&]() -> int {
 			switch(1) { case 1:
-				path oRoot("/mnt/dev/zzlee/p210");
+				path oRoot("tests");
 				path oSrcPath = oRoot / path("1080.y210-compact");
 				path oDstPath = oRoot / path("1080.y210");
 				path oLogPath = oRoot / path("1080.y210.log");
@@ -178,52 +192,8 @@ namespace __03_p210__ {
 
 						uint40_m a = *(uint40_m*)&vSrc[nSrcIdx + 0];
 
-#if 1
-						uint16_t y0 = (uint16_t)(uint32_t(a.u8s[1] & 0x03) << 8) |
-							uint32_t((a.u8s[0] & 0xFF));
-
-						uint16_t u0 = (uint16_t)(uint32_t(a.u8s[2] & 0x0F) << 6) |
-							uint32_t((a.u8s[1] & 0xFC) >> 2);
-
-						uint16_t y1 = (uint16_t)(uint32_t(a.u8s[3] & 0x3F) << 4) |
-							uint32_t((a.u8s[2] & 0xF0) >> 4);
-
-						uint16_t v0 = (uint16_t)(uint32_t(a.u8s[4] & 0xFF) << 2) |
-							uint32_t((a.u8s[3] & 0xC0) >> 6);
-#endif
-
-#if 0
-						char buf[256];
-						sprintf(buf, "[%03X %03X %03X %03X]",
-							(int)y0, (int)v0, (int)y1, (int)v0);
-
-						ofLog << buf;
-#endif
-
-#if 0
-						char buf[256];
-						sprintf(buf, "[%02X %02X %02X %02X %02X]",
-							(int)a.u8s[0], (int)a.u8s[1], (int)a.u8s[2], (int)a.u8s[3], (int)a.u8s[4]);
-
-						ofLog << buf;
-#endif
-
-#if 1
-						*(uint16_t*)&vDst[nDstIdx + 0] = y0;
-						*(uint16_t*)&vDst[nDstIdx + 2] = u0;
-						*(uint16_t*)&vDst[nDstIdx + 4] = y1;
-						*(uint16_t*)&vDst[nDstIdx + 6] = v0;
-#endif
-
-#if 0
-						*(uint16_t*)&vDst[nDstIdx +  0] = cvt_8_10(178);
-						*(uint16_t*)&vDst[nDstIdx +  2] = cvt_8_10(128);
-						*(uint16_t*)&vDst[nDstIdx +  4] = cvt_8_10(178);
-						*(uint16_t*)&vDst[nDstIdx +  6] = cvt_8_10(128);
-#endif
+						cvt_yuyv10c_2_yuyv16(&a, (uint16_t*)&vDst[nDstIdx + 0]);
 					}
-
-					ofLog << std::endl;
 				}
 
 				LOGD("cvt_10_8...");

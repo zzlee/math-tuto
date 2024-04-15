@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstring>
 
+#ifdef __AVX__
 #include <emmintrin.h>
+#endif
 
 ZZ_INIT_LOG("01_yuv");
 
