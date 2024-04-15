@@ -1,7 +1,8 @@
 SUBDIRS += \
 	samples/01_yuv \
 	samples/02_hnet \
-	samples/03_p210
+	samples/03_p210 \
+	samples/04_p210-cuda
 
 .PHONY: all
 all:

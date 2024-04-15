@@ -1,12 +1,20 @@
 include ../Rules.mk
 
-APP := 01_yuv
+APP := 04_p210-cuda
 
 SRCS := \
 	main.cpp \
+	kernels.cu \
 	$(wildcard $(COMMON_DIR)/*.cpp)
 
 OBJS := $(SRCS:.cpp=.o)
+OBJS := $(OBJS:.cu=.o)
+
+$(info OBJS=${OBJS})
+
+LDFLAGS += -lboost_filesystem
+LDFLAGS += -L/usr/local/cuda/targets/aarch64-linux/lib
+LDFLAGS += -lcuda -lcudart
 
 all: $(APP)
 
@@ -20,6 +28,10 @@ $(COMMON_DIR)/%.o: $(COMMON_DIR)/%.cpp
 	@echo "Compiling: $<"
 	$(CPP) $(CPPFLAGS) -fPIC -c $< -o $@
 
+%.o: %.cu
+	@echo "CUDA Compiling: $<"
+	${NVCC} $(GENCODE_FLAGS) -c $< -o $@
+
 $(APP): $(OBJS)
-	@echo "Linking: $@"
+	@echo "Linking: $@ ($^)"
 	$(CPP) -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
