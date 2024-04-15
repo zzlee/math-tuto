@@ -1,5 +1,6 @@
 #include "ZzLog.h"
 #include "ZzUtils.h"
+#include "ZzClock.h"
 
 #include <stdint.h>
 #include <fstream>
@@ -8,6 +9,7 @@
 ZZ_INIT_LOG("03_p210");
 
 using namespace boost::filesystem;
+using namespace __zz_clock__;
 
 namespace __03_p210__ {
 	struct App;
@@ -185,44 +187,52 @@ namespace __03_p210__ {
 				b.u32 = 0x1234;
 				LOGD("%04X, %04X", b.u32, tohs(b.u32));
 
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nSrcIdx = y * nSrcStep + x * 5;
-						int nDstIdx = y * nDstStep + x * 8;
+				int nTries = 500;
+				LOGD("Starts, nTries=%d", nTries);
 
-						uint40_m a = *(uint40_m*)&vSrc[nSrcIdx + 0];
+				int64_t nBeginTime = _clk();
+				for(int i = 0;i < nTries;i++) {
+					for(int y = 0;y < nHeight;y++) {
+						for(int x = 0;x < nWidth / 2;x++) {
+							int nSrcIdx = y * nSrcStep + x * 5;
+							int nDstIdx = y * nDstStep + x * 8;
 
-						cvt_yuyv10c_2_yuyv16(&a, (uint16_t*)&vDst[nDstIdx + 0]);
+							uint40_m a = *(uint40_m*)&vSrc[nSrcIdx + 0];
+
+							cvt_yuyv10c_2_yuyv16(&a, (uint16_t*)&vDst[nDstIdx + 0]);
+						}
 					}
-				}
 
-				LOGD("cvt_10_8...");
 #if 1
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nDstIdx = y * nDstStep + x * 8;
+					// LOGD("cvt_10_8...");
+					for(int y = 0;y < nHeight;y++) {
+						for(int x = 0;x < nWidth / 2;x++) {
+							int nDstIdx = y * nDstStep + x * 8;
 
-						*(uint16_t*)&vDst[nDstIdx + 0] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 0]);
-						*(uint16_t*)&vDst[nDstIdx + 2] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 2]);
-						*(uint16_t*)&vDst[nDstIdx + 4] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 4]);
-						*(uint16_t*)&vDst[nDstIdx + 6] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 6]);
+							*(uint16_t*)&vDst[nDstIdx + 0] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 0]);
+							*(uint16_t*)&vDst[nDstIdx + 2] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 2]);
+							*(uint16_t*)&vDst[nDstIdx + 4] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 4]);
+							*(uint16_t*)&vDst[nDstIdx + 6] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 6]);
+						}
 					}
-				}
 #endif
 
-				LOGD("tohs...");
 #if 1
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nDstIdx = y * nDstStep + x * 8;
+					// LOGD("tohs...");
+					for(int y = 0;y < nHeight;y++) {
+						for(int x = 0;x < nWidth / 2;x++) {
+							int nDstIdx = y * nDstStep + x * 8;
 
-						*(uint16_t*)&vDst[nDstIdx + 0] = tohs(*(uint16_t*)&vDst[nDstIdx + 0]);
-						*(uint16_t*)&vDst[nDstIdx + 2] = tohs(*(uint16_t*)&vDst[nDstIdx + 2]);
-						*(uint16_t*)&vDst[nDstIdx + 4] = tohs(*(uint16_t*)&vDst[nDstIdx + 4]);
-						*(uint16_t*)&vDst[nDstIdx + 6] = tohs(*(uint16_t*)&vDst[nDstIdx + 6]);
+							*(uint16_t*)&vDst[nDstIdx + 0] = tohs(*(uint16_t*)&vDst[nDstIdx + 0]);
+							*(uint16_t*)&vDst[nDstIdx + 2] = tohs(*(uint16_t*)&vDst[nDstIdx + 2]);
+							*(uint16_t*)&vDst[nDstIdx + 4] = tohs(*(uint16_t*)&vDst[nDstIdx + 4]);
+							*(uint16_t*)&vDst[nDstIdx + 6] = tohs(*(uint16_t*)&vDst[nDstIdx + 6]);
+						}
 					}
-				}
 #endif
+				}
+				int64_t nEndTime = _clk();
+				LOGD("FPS: %.2f", (nTries * 1000000.0) / (nEndTime - nBeginTime));
 
 				if(! ofDst.write((char*)&vDst[0], vDst.size())) {
 					LOGE("%s(%d): ofDst.read() failed", __FUNCTION__, __LINE__);

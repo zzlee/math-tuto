@@ -1,66 +1,123 @@
 #include <stdio.h>
 
-enum {
-	PRECISION = 6,
-	PRECISION_FACTOR = (1<<PRECISION),
-};
+typedef unsigned short uint16_t;
 
-struct zppi_yuv2rgb_t {
-	short y_shift;
-	short y_factor;
-	short v_r_factor;
-	short u_g_factor;
-	short v_g_factor;
-	short u_b_factor;
-};
+__device__ void cvt_yuyv10c_2_yuyv16(uchar1* src, uint16_t* dst) {
+	uchar1 s1 = src[1];
+	uchar1 s2 = src[2];
+	uchar1 s3 = src[3];
 
-__device__ short kernel_clamp(short x) {
-	return max(0, min(255, x));
+	dst[0] = (uint16_t)(int(s1.x & 0x03) << 8) |
+		int((src[0].x & 0xFF));
+
+	dst[1] = (uint16_t)(int(s2.x & 0x0F) << 6) |
+		int((s1.x & 0xFC) >> 2);
+
+	dst[2] = (uint16_t)(int(s3.x & 0x3F) << 4) |
+		int((s2.x & 0xF0) >> 4);
+
+	dst[3] = (uint16_t)(int(src[4].x & 0xFF) << 2) |
+		int((s3.x & 0xC0) >> 6);
 }
 
-// |R|                        |y_factor      0       v_r_factor|   |Y-y_shift|
-// |G| = 1/PRECISION_FACTOR * |y_factor  u_g_factor  v_g_factor| * |  U-128  |
-// |B|                        |y_factor  u_b_factor      0     |   |  V-128  |
-__device__ void kernel_yuv_rgb(short y, short u, short v, uchar1 rgb[3], zppi_yuv2rgb_t* param) {
-	short y_ = param->y_factor * y;
-
-	rgb[0].x = kernel_clamp((y_ + param->v_r_factor * v) >> PRECISION);
-	rgb[1].x = kernel_clamp((y_ + param->u_g_factor * u + param->v_g_factor * v) >> PRECISION);
-	rgb[2].x = kernel_clamp((y_ + param->u_b_factor * u) >> PRECISION);
+__device__ void cvt_10_8(uint16_t* src, uint16_t* dst) {
+#if 0
+	*dst = (uint16_t)((int)*src * 0xFF / 0x3FF);
+#else
+	*dst = (*src >> 2);
+#endif
 }
 
-__global__ void kernel_YCbCr422_RGB_8u_C2C3R(uchar1* pSrc, int srcStep,
-	uchar1* pDst, int dstStep, int nWidth, int nHeight, zppi_yuv2rgb_t* param) {
+__device__ void endian_swap(uint16_t* src, uint16_t* dst) {
+#if 1
+		uint16_t a = *dst;
+
+		*src = (int16_t)(((a & 0xFF00) >> 8) | ((a & 0x00FF) << 8));
+#endif
+}
+
+__global__ void kernel_YUYV_10c_16s_C2R(uchar1* pSrc, int srcStep,
+	uchar1* pDst, int dstStep, int nWidth, int nHeight) {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
 	if(x < nWidth && y < nHeight) {
-		int nSrcIdx = y * srcStep + x * 4;
-		int nDstIdx = y * dstStep + x * 6;
+		int nSrcIdx = y * srcStep + x * 5;
+		int nDstIdx = y * dstStep + x * 8;
 
-		short y0 = (short)pSrc[nSrcIdx + 0].x - (short)param->y_shift;
-		short u0 = (short)pSrc[nSrcIdx + 1].x - 128;
-		short y1 = (short)pSrc[nSrcIdx + 2].x - (short)param->y_shift;
-		short v0 = (short)pSrc[nSrcIdx + 3].x - 128;
-
-		kernel_yuv_rgb(y0, u0, v0, &pDst[nDstIdx + 0], param);
-		kernel_yuv_rgb(y1, u0, v0, &pDst[nDstIdx + 3], param);
+		cvt_yuyv10c_2_yuyv16(&pSrc[nSrcIdx + 0], (uint16_t*)&pDst[nDstIdx + 0]);
 	}
 }
 
-cudaError_t zppiYCbCr422_RGB_8u_C2C3R(
-	uchar1* pSrc, int srcStep, uchar1* pDst, int dstStep, int nWidth, int nHeight, zppi_yuv2rgb_t* param) {
-	static int BLOCK_W = 16;
-	static int BLOCK_H = 16;
+cudaError_t zppiYUYV_10c_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight) {
+	const int BLOCK_W = 16;
+	const int BLOCK_H = 16;
+
+	nWidth /= 2;
 
 	dim3 grid((nWidth + BLOCK_W-1) / BLOCK_W, (nHeight + BLOCK_H-1) / BLOCK_H, 1);
 	dim3 block(BLOCK_W, BLOCK_H, 1);
 
-	kernel_YCbCr422_RGB_8u_C2C3R<<<grid, block>>>(
-		pSrc, srcStep,
-		pDst, dstStep,
-		nWidth / 2, nHeight, param);
+	kernel_YUYV_10c_16s_C2R<<<grid, block>>>(
+		(uchar1*)pSrc, srcStep, (uchar1*)pDst, dstStep, nWidth, nHeight);
 
 	return cudaDeviceSynchronize();
 }
 
+__global__ void kernel_Narrow10to8_16u_C2R(uchar1* pSrc, int srcStep,
+	uchar1* pDst, int dstStep, int nWidth, int nHeight) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if(x < nWidth && y < nHeight) {
+		int nSrcIdx = y * srcStep + x * 2;
+		int nDstIdx = y * dstStep + x * 2;
+
+		cvt_10_8((uint16_t*)&pSrc[nSrcIdx + 0], (uint16_t*)&pDst[nDstIdx + 0]);
+	}
+}
+
+cudaError_t zppiNarrow10to8_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight) {
+	const int BLOCK_W = 16;
+	const int BLOCK_H = 16;
+
+	dim3 grid((nWidth + BLOCK_W-1) / BLOCK_W, (nHeight + BLOCK_H-1) / BLOCK_H, 1);
+	dim3 block(BLOCK_W, BLOCK_H, 1);
+
+	kernel_Narrow10to8_16u_C2R<<<grid, block>>>(
+		(uchar1*)pSrc, srcStep, (uchar1*)pDst, dstStep, nWidth, nHeight);
+
+	return cudaDeviceSynchronize();
+}
+
+__global__ void kernel_EndianSwap_16u_C2R(uchar1* pSrc, int srcStep,
+	uchar1* pDst, int dstStep, int nWidth, int nHeight) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if(x < nWidth && y < nHeight) {
+		int nSrcIdx = y * srcStep + x * 2;
+		int nDstIdx = y * dstStep + x * 2;
+
+		endian_swap((uint16_t*)&pSrc[nSrcIdx + 0], (uint16_t*)&pDst[nDstIdx + 0]);
+	}
+}
+
+cudaError_t zppiEndianSwap_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight) {
+	const int BLOCK_W = 16;
+	const int BLOCK_H = 16;
+
+	dim3 grid((nWidth + BLOCK_W-1) / BLOCK_W, (nHeight + BLOCK_H-1) / BLOCK_H, 1);
+	dim3 block(BLOCK_W, BLOCK_H, 1);
+
+	kernel_EndianSwap_16u_C2R<<<grid, block>>>(
+		(uchar1*)pSrc, srcStep, (uchar1*)pDst, dstStep, nWidth, nHeight);
+
+	return cudaDeviceSynchronize();
+}

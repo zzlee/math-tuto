@@ -1,5 +1,6 @@
 #include "ZzLog.h"
 #include "ZzUtils.h"
+#include "ZzClock.h"
 
 #include <stdint.h>
 #include <fstream>
@@ -11,6 +12,17 @@
 ZZ_INIT_LOG("03_p210");
 
 using namespace boost::filesystem;
+using namespace __zz_clock__;
+
+extern cudaError_t zppiYUYV_10c_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight);
+extern cudaError_t zppiNarrow10to8_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight);
+extern cudaError_t zppiEndianSwap_16u_C2R(
+	const void* pSrc, int srcStep,
+	void* pDst, int dstStep, int nWidth, int nHeight);
 
 namespace __03_p210__ {
 	struct App;
@@ -20,11 +32,11 @@ namespace __03_p210__ {
 
 		struct {
 			uint8_t x, y, z, w;
-		} __attribute__ ((aligned (2))) u8;
+		} __attribute__ ((aligned (1))) u8;
 
 		struct {
 			uint16_t x, y;
-		} __attribute__ ((aligned (2))) u16;
+		} __attribute__ ((aligned (1))) u16;
 
 		uint8_t u8s[4];
 		uint8_t u16s[2];
@@ -35,7 +47,7 @@ namespace __03_p210__ {
 
 		struct {
 			uint8_t x, y;
-		} __attribute__ ((aligned (2))) u8;
+		} __attribute__ ((aligned (1))) u8;
 
 		uint8_t u8s[2];
 	};
@@ -43,7 +55,7 @@ namespace __03_p210__ {
 	union uint40_m {
 		struct {
 			uint8_t a, b, c, d, e;
-		} __attribute__ ((aligned (2))) u8;
+		} __attribute__ ((aligned (1))) u8;
 
 		uint8_t u8s[5];
 	};
@@ -65,6 +77,11 @@ namespace __03_p210__ {
 		std::vector<uint8_t> vSrc;
 		int nDstStep;
 		std::vector<uint8_t> vDst;
+
+		void* pSrc_cuda;
+		size_t nSrcPitch_cuda;
+		void* pDst_cuda;
+		size_t nDstPitch_cuda;
 
 		App(int argc, char **argv);
 		~App();
@@ -107,7 +124,11 @@ namespace __03_p210__ {
 	}
 
 	inline uint8_t cvt_10_8(uint16_t a) {
+#if 0
 		return (uint8_t)((uint32_t)a * 0xFF / 0x3FF);
+#else
+		return (uint8_t)(a >> 2);
+#endif
 	}
 }
 
@@ -125,6 +146,8 @@ namespace __03_p210__ {
 
 		ZzUtils::TestLoop([&]() -> int {
 			switch(1) { case 1:
+				cudaError_t cuerr;
+
 				path oRoot("tests");
 				path oSrcPath = oRoot / path("1080.y210-compact");
 				path oDstPath = oRoot / path("1080.y210");
@@ -173,13 +196,108 @@ namespace __03_p210__ {
 					vDst.clear();
 				};
 
+				cuerr = cudaMallocPitch(&pSrc_cuda, &nSrcPitch_cuda, nSrcStep, nHeight);
+				if(cuerr != cudaSuccess) {
+					LOGE("cudaMallocPitch(), cuerr=%d", cuerr);
+					break;
+				}
+				oFreeStack += [&]() {
+					cudaFree(pSrc_cuda);
+				};
+
+				cuerr = cudaMallocPitch(&pDst_cuda, &nDstPitch_cuda, nDstStep, nHeight);
+				if(cuerr != cudaSuccess) {
+					LOGE("cudaMallocPitch(), cuerr=%d", cuerr);
+					break;
+				}
+				oFreeStack += [&]() {
+					cudaFree(pDst_cuda);
+				};
+
+				LOGD("Loading...");
 				if(! ifSrc.read((char*)&vSrc[0], vSrc.size())) {
 					LOGE("%s(%d): ifSrc.read() failed", __FUNCTION__, __LINE__);
 					break;
 				}
 
-				LOGD("%d, %d", sizeof(uint32_m), sizeof(uint16_m));
+				LOGD("%d, %d, %d", sizeof(uint32_m), sizeof(uint16_m), sizeof(uint40_m));
 
+				LOGD("cudaMemcpyHostToDevice");
+				cuerr = cudaMemcpy2D(pSrc_cuda, nSrcPitch_cuda, &vSrc[0], nSrcStep, nSrcStep, nHeight, cudaMemcpyHostToDevice);
+				if(cuerr != cudaSuccess) {
+					LOGE("cudaMemcpy2D(), cuerr=%d", cuerr);
+					break;
+				}
+
+				int nTries = 500;
+				LOGD("Starts, nTries=%d", nTries);
+
+				int64_t nBeginTime = _clk();
+				for(int i = 0;i < nTries;i++) {
+					// LOGD("zppiYUYV_10c_16u_C2R...");
+					cuerr = zppiYUYV_10c_16u_C2R(pSrc_cuda, nSrcPitch_cuda, pDst_cuda, nDstPitch_cuda, nWidth, nHeight);
+					if(cuerr != cudaSuccess) {
+						LOGE("zppiYUYV_10c_16u_C2R(), cuerr=%d", cuerr);
+						break;
+					}
+
+#if 1
+					// LOGD("zppiNarrow10to8_16u_C2R...");
+					cuerr = zppiNarrow10to8_16u_C2R(pDst_cuda, nDstPitch_cuda, pDst_cuda, nDstPitch_cuda, nWidth * 2, nHeight);
+					if(cuerr != cudaSuccess) {
+						LOGE("zppiNarrow10to8_16u_C2R(), cuerr=%d", cuerr);
+						break;
+					}
+#endif
+
+#if 1
+					// LOGD("zppiEndianSwap_16u_C2R...");
+					cuerr = zppiEndianSwap_16u_C2R(pDst_cuda, nDstPitch_cuda, pDst_cuda, nDstPitch_cuda, nWidth * 2, nHeight);
+					if(cuerr != cudaSuccess) {
+						LOGE("zppiEndianSwap_16u_C2R(), cuerr=%d", cuerr);
+						break;
+					}
+#endif
+				}
+				int64_t nEndTime = _clk();
+				LOGD("FPS: %.2f", (nTries * 1000000.0) / (nEndTime - nBeginTime));
+
+				LOGD("cudaMemcpyDeviceToHost");
+				cuerr = cudaMemcpy2D(&vDst[0], nDstStep, pDst_cuda, nDstPitch_cuda, nDstStep, nHeight, cudaMemcpyDeviceToHost);
+				if(cuerr != cudaSuccess) {
+					LOGE("cudaMemcpy2D(), cuerr=%d", cuerr);
+					break;
+				}
+
+#if 0
+				LOGD("cvt_10_8...");
+				for(int y = 0;y < nHeight;y++) {
+					for(int x = 0;x < nWidth / 2;x++) {
+						int nDstIdx = y * nDstStep + x * 8;
+
+						*(uint16_t*)&vDst[nDstIdx + 0] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 0]);
+						*(uint16_t*)&vDst[nDstIdx + 2] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 2]);
+						*(uint16_t*)&vDst[nDstIdx + 4] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 4]);
+						*(uint16_t*)&vDst[nDstIdx + 6] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 6]);
+					}
+				}
+#endif
+
+#if 0
+				LOGD("tohs...");
+				for(int y = 0;y < nHeight;y++) {
+					for(int x = 0;x < nWidth / 2;x++) {
+						int nDstIdx = y * nDstStep + x * 8;
+
+						*(uint16_t*)&vDst[nDstIdx + 0] = tohs(*(uint16_t*)&vDst[nDstIdx + 0]);
+						*(uint16_t*)&vDst[nDstIdx + 2] = tohs(*(uint16_t*)&vDst[nDstIdx + 2]);
+						*(uint16_t*)&vDst[nDstIdx + 4] = tohs(*(uint16_t*)&vDst[nDstIdx + 4]);
+						*(uint16_t*)&vDst[nDstIdx + 6] = tohs(*(uint16_t*)&vDst[nDstIdx + 6]);
+					}
+				}
+#endif
+
+				LOGD("Writing");
 				if(! ofDst.write((char*)&vDst[0], vDst.size())) {
 					LOGE("%s(%d): ofDst.read() failed", __FUNCTION__, __LINE__);
 					break;

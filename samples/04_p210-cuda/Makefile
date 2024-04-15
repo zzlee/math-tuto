@@ -11,7 +11,10 @@ OBJS := $(filter %.o,$(SRCS:.cpp=.o) $(SRCS:.cu=.o))
 
 CXXFLAGS += -I/usr/local/cuda/include
 
-LDFLAGS += -lboost_filesystem
+LDFLAGS += -Wl,-Bstatic
+LDFLAGS += -lboost_filesystem -lboost_system
+
+LDFLAGS += -Wl,-Bdynamic
 LDFLAGS += -L/usr/local/cuda/lib64
 LDFLAGS += -lcuda -lcudart
 

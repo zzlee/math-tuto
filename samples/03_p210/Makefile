@@ -8,7 +8,10 @@ SRCS := \
 
 OBJS := $(SRCS:.cpp=.o)
 
-LDFLAGS += -lboost_filesystem
+LDFLAGS += -Wl,-Bstatic
+LDFLAGS += -lboost_filesystem -lboost_system
+
+LDFLAGS += -Wl,-Bdynamic
 
 all: $(APP)
 
