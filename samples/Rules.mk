@@ -1,5 +1,5 @@
 # # Clear the flags from env
-# CPPFLAGS :=
+# CXXFLAGS :=
 # LDFLAGS :=
 
 # Verbose flag
@@ -15,7 +15,7 @@ endif
 AS             = $(AT) $(CROSS_COMPILE)as
 LD             = $(AT) $(CROSS_COMPILE)ld
 CC             = $(AT) $(CROSS_COMPILE)gcc
-CPP            = $(AT) $(CROSS_COMPILE)g++
+CXX            = $(AT) $(CROSS_COMPILE)g++
 AR             = $(AT) $(CROSS_COMPILE)ar
 NM             = $(AT) $(CROSS_COMPILE)nm
 STRIP          = $(AT) $(CROSS_COMPILE)strip
@@ -25,7 +25,7 @@ NVCC           = $(AT) /usr/local/cuda/bin/nvcc
 
 # Specify the logical root directory for headers and libraries.
 ifneq ($(TARGET_ROOTFS),)
-CPPFLAGS += --sysroot=$(TARGET_ROOTFS)
+CXXFLAGS += --sysroot=$(TARGET_ROOTFS)
 CFLAGS += --sysroot=$(TARGET_ROOTFS)
 LDFLAGS +=
 endif
@@ -38,13 +38,13 @@ GENCODE_SM87=-gencode arch=compute_87,code=sm_87
 GENCODE_SM_PTX=-gencode arch=compute_72,code=compute_72
 GENCODE_FLAGS=$(GENCODE_SM53) $(GENCODE_SM62) $(GENCODE_SM72) $(GENCODE_SM87) $(GENCODE_SM_PTX)
 
-CPPFLAGS += \
+CXXFLAGS += \
 -Ofast
 CFLAGS += \
 -Ofast
 
 # All common header files
-CPPFLAGS += -std=c++11 \
+CXXFLAGS += -std=c++11 \
 -I../common
 CFLAGS += \
 -I../common

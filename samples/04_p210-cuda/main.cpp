@@ -5,6 +5,9 @@
 #include <fstream>
 #include <boost/filesystem.hpp>
 
+#include <cuda_runtime_api.h>
+#include <cuda.h>
+
 ZZ_INIT_LOG("03_p210");
 
 using namespace boost::filesystem;
@@ -176,53 +179,6 @@ namespace __03_p210__ {
 				}
 
 				LOGD("%d, %d", sizeof(uint32_m), sizeof(uint16_m));
-
-				uint32_m a;
-				a.u32 = 0x1234ABCD;
-				LOGD("%08X, %08X", a.u32, tohl(a.u32));
-
-				uint32_m b;
-				b.u32 = 0x1234;
-				LOGD("%04X, %04X", b.u32, tohs(b.u32));
-
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nSrcIdx = y * nSrcStep + x * 5;
-						int nDstIdx = y * nDstStep + x * 8;
-
-						uint40_m a = *(uint40_m*)&vSrc[nSrcIdx + 0];
-
-						cvt_yuyv10c_2_yuyv16(&a, (uint16_t*)&vDst[nDstIdx + 0]);
-					}
-				}
-
-				LOGD("cvt_10_8...");
-#if 1
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nDstIdx = y * nDstStep + x * 8;
-
-						*(uint16_t*)&vDst[nDstIdx + 0] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 0]);
-						*(uint16_t*)&vDst[nDstIdx + 2] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 2]);
-						*(uint16_t*)&vDst[nDstIdx + 4] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 4]);
-						*(uint16_t*)&vDst[nDstIdx + 6] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 6]);
-					}
-				}
-#endif
-
-				LOGD("tohs...");
-#if 1
-				for(int y = 0;y < nHeight;y++) {
-					for(int x = 0;x < nWidth / 2;x++) {
-						int nDstIdx = y * nDstStep + x * 8;
-
-						*(uint16_t*)&vDst[nDstIdx + 0] = tohs(*(uint16_t*)&vDst[nDstIdx + 0]);
-						*(uint16_t*)&vDst[nDstIdx + 2] = tohs(*(uint16_t*)&vDst[nDstIdx + 2]);
-						*(uint16_t*)&vDst[nDstIdx + 4] = tohs(*(uint16_t*)&vDst[nDstIdx + 4]);
-						*(uint16_t*)&vDst[nDstIdx + 6] = tohs(*(uint16_t*)&vDst[nDstIdx + 6]);
-					}
-				}
-#endif
 
 				if(! ofDst.write((char*)&vDst[0], vDst.size())) {
 					LOGE("%s(%d): ofDst.read() failed", __FUNCTION__, __LINE__);

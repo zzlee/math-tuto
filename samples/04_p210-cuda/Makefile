@@ -7,13 +7,12 @@ SRCS := \
 	kernels.cu \
 	$(wildcard $(COMMON_DIR)/*.cpp)
 
-OBJS := $(SRCS:.cpp=.o)
-OBJS := $(OBJS:.cu=.o)
+OBJS := $(filter %.o,$(SRCS:.cpp=.o) $(SRCS:.cu=.o))
 
-$(info OBJS=${OBJS})
+CXXFLAGS += -I/usr/local/cuda/include
 
 LDFLAGS += -lboost_filesystem
-LDFLAGS += -L/usr/local/cuda/targets/aarch64-linux/lib
+LDFLAGS += -L/usr/local/cuda/lib64
 LDFLAGS += -lcuda -lcudart
 
 all: $(APP)
@@ -26,12 +25,12 @@ $(COMMON_DIR)/%.o: $(COMMON_DIR)/%.cpp
 
 %.o: %.cpp
 	@echo "Compiling: $<"
-	$(CPP) $(CPPFLAGS) -fPIC -c $< -o $@
+	$(CXX) $(CXXFLAGS) -fPIC -c $< -o $@
 
 %.o: %.cu
 	@echo "CUDA Compiling: $<"
 	${NVCC} $(GENCODE_FLAGS) -c $< -o $@
 
 $(APP): $(OBJS)
-	@echo "Linking: $@ ($^)"
-	$(CPP) -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
+	@echo "Linking: $@"
+	$(CXX) -o $@ $(OBJS) $(CXXFLAGS) $(LDFLAGS)
