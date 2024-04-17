@@ -241,7 +241,7 @@ namespace __03_p210__ {
 						break;
 					}
 
-#if 1
+#if 0
 					// LOGD("zppiNarrow10to8_16u_C2R...");
 					cuerr = zppiNarrow10to8_16u_C2R(pDst_cuda, nDstPitch_cuda, pDst_cuda, nDstPitch_cuda, nWidth * 2, nHeight);
 					if(cuerr != cudaSuccess) {
@@ -250,7 +250,7 @@ namespace __03_p210__ {
 					}
 #endif
 
-#if 1
+#if 0
 					// LOGD("zppiEndianSwap_16u_C2R...");
 					cuerr = zppiEndianSwap_16u_C2R(pDst_cuda, nDstPitch_cuda, pDst_cuda, nDstPitch_cuda, nWidth * 2, nHeight);
 					if(cuerr != cudaSuccess) {
