@@ -80,17 +80,17 @@ namespace __03_p210__ {
 	}
 
 	inline void cvt_yuyv10c_2_yuyv16(uint40_m* src, uint16_t* dst) {
-		dst[0] = (uint16_t)(uint32_t(src->u8s[1] & 0x03) << 8) |
-			uint32_t((src->u8s[0] & 0xFF));
+		dst[0] = uint16_t(((uint32_t(src->u8s[1] & 0x03) << 8) |
+			uint32_t((src->u8s[0] & 0xFF))) * 0xFFFF / 0x3FF);
 
-		dst[1] = (uint16_t)(uint32_t(src->u8s[2] & 0x0F) << 6) |
-			uint32_t((src->u8s[1] & 0xFC) >> 2);
+		dst[1] = uint16_t(((uint32_t(src->u8s[2] & 0x0F) << 6) |
+			uint32_t((src->u8s[1] & 0xFC) >> 2)) * 0xFFFF / 0x3FF);
 
-		dst[2] = (uint16_t)(uint32_t(src->u8s[3] & 0x3F) << 4) |
-			uint32_t((src->u8s[2] & 0xF0) >> 4);
+		dst[2] = uint16_t(((uint32_t(src->u8s[3] & 0x3F) << 4) |
+			uint32_t((src->u8s[2] & 0xF0) >> 4)) * 0xFFFF / 0x3FF);
 
-		dst[3] = (uint16_t)(uint32_t(src->u8s[4] & 0xFF) << 2) |
-			uint32_t((src->u8s[3] & 0xC0) >> 6);
+		dst[3] = uint16_t(((uint32_t(src->u8s[4] & 0xFF) << 2) |
+			uint32_t((src->u8s[3] & 0xC0) >> 6)) * 0xFFFF / 0x3FF);
 	}
 
 	inline uint32_t tohl(uint32_t a) {
@@ -179,13 +179,25 @@ namespace __03_p210__ {
 
 				LOGD("%d, %d", sizeof(uint32_m), sizeof(uint16_m));
 
-				uint32_m a;
-				a.u32 = 0x1234ABCD;
-				LOGD("%08X, %08X", a.u32, tohl(a.u32));
+				{
+					uint8_t a[2] = { 0xC0, 0x02 };
+					uint16_t b = *(uint16_t*)a;
+					LOGD("%02X%02X, %04X, %04X", (int)a[0], (int)a[1],
+						(int)b, (int)(b << 6));
+				}
 
-				uint32_m b;
-				b.u32 = 0x1234;
-				LOGD("%04X, %04X", b.u32, tohs(b.u32));
+				{
+					uint8_t a[2] = { 0x02, 0x02 };
+					uint16_t b = *(uint16_t*)a;
+					LOGD("%02X%02X, %04X, %04X", (int)a[0], (int)a[1],
+						(int)b, (int)(b << 6));
+				}
+
+				int nY = 76 * 0xFFFF / 0xFF;
+				int nU = 84 * 0xFFFF / 0xFF;
+				int nV = 255 * 0xFFFF / 0xFF;
+
+				LOGD("%d(0x%04X), %d(0x%04X), %d(0x%04X)", nY, nY, nU, nU, nV, nV);
 
 				int nTries = 500;
 				LOGD("Starts, nTries=%d", nTries);
@@ -199,37 +211,16 @@ namespace __03_p210__ {
 
 							uint40_m a = *(uint40_m*)&vSrc[nSrcIdx + 0];
 
+#if 1
 							cvt_yuyv10c_2_yuyv16(&a, (uint16_t*)&vDst[nDstIdx + 0]);
-						}
-					}
-
-#if 1
-					// LOGD("cvt_10_8...");
-					for(int y = 0;y < nHeight;y++) {
-						for(int x = 0;x < nWidth / 2;x++) {
-							int nDstIdx = y * nDstStep + x * 8;
-
-							*(uint16_t*)&vDst[nDstIdx + 0] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 0]);
-							*(uint16_t*)&vDst[nDstIdx + 2] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 2]);
-							*(uint16_t*)&vDst[nDstIdx + 4] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 4]);
-							*(uint16_t*)&vDst[nDstIdx + 6] = (uint16_t)cvt_10_8(*(uint16_t*)&vDst[nDstIdx + 6]);
-						}
-					}
+#else
+							*(uint16_t*)&vDst[nDstIdx + 0] = nY;
+							*(uint16_t*)&vDst[nDstIdx + 2] = nU;
+							*(uint16_t*)&vDst[nDstIdx + 4] = nY;
+							*(uint16_t*)&vDst[nDstIdx + 6] = nV;
 #endif
-
-#if 1
-					// LOGD("tohs...");
-					for(int y = 0;y < nHeight;y++) {
-						for(int x = 0;x < nWidth / 2;x++) {
-							int nDstIdx = y * nDstStep + x * 8;
-
-							*(uint16_t*)&vDst[nDstIdx + 0] = tohs(*(uint16_t*)&vDst[nDstIdx + 0]);
-							*(uint16_t*)&vDst[nDstIdx + 2] = tohs(*(uint16_t*)&vDst[nDstIdx + 2]);
-							*(uint16_t*)&vDst[nDstIdx + 4] = tohs(*(uint16_t*)&vDst[nDstIdx + 4]);
-							*(uint16_t*)&vDst[nDstIdx + 6] = tohs(*(uint16_t*)&vDst[nDstIdx + 6]);
 						}
 					}
-#endif
 				}
 				int64_t nEndTime = _clk();
 				LOGD("FPS: %.2f", (nTries * 1000000.0) / (nEndTime - nBeginTime));

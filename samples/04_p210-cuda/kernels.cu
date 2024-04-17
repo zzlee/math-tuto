@@ -7,17 +7,17 @@ __device__ void cvt_yuyv10c_2_yuyv16(uchar1* src, uint16_t* dst) {
 	uchar1 s2 = src[2];
 	uchar1 s3 = src[3];
 
-	dst[0] = (uint16_t)(int(s1.x & 0x03) << 8) |
-		int((src[0].x & 0xFF));
+	dst[0] = uint16_t(((int(s1.x & 0x03) << 8) |
+		int((src[0].x & 0xFF))) * 0xFFFF / 0x3FF);
 
-	dst[1] = (uint16_t)(int(s2.x & 0x0F) << 6) |
-		int((s1.x & 0xFC) >> 2);
+	dst[1] = uint16_t((((int(s2.x & 0x0F) << 6) |
+		int((s1.x & 0xFC) >> 2))) * 0xFFFF / 0x3FF);
 
-	dst[2] = (uint16_t)(int(s3.x & 0x3F) << 4) |
-		int((s2.x & 0xF0) >> 4);
+	dst[2] = uint16_t((((int(s3.x & 0x3F) << 4) |
+		int((s2.x & 0xF0) >> 4))) * 0xFFFF / 0x3FF);
 
-	dst[3] = (uint16_t)(int(src[4].x & 0xFF) << 2) |
-		int((s3.x & 0xC0) >> 6);
+	dst[3] = uint16_t((((int(src[4].x & 0xFF) << 2) |
+		int((s3.x & 0xC0) >> 6))) * 0xFFFF / 0x3FF);
 }
 
 __device__ void cvt_10_8(uint16_t* src, uint16_t* dst) {
