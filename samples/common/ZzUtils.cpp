@@ -1,6 +1,10 @@
 #include "ZzUtils.h"
 #include "ZzLog.h"
 
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 ZZ_INIT_LOG("ZzUtils");
 
 #include "ZzClock.h"
@@ -24,7 +28,7 @@ namespace ZzUtils {
 		}
 	}
 
-	void TestLoop(boost::function<int ()> idle, int64_t dur_num, int64_t dur_den) {
+	void TestLoop(std::function<int ()> idle, int64_t dur_num, int64_t dur_den) {
 		int err;
 
 		int fd_stdin = 0; // stdin

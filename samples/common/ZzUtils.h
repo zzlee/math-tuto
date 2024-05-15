@@ -1,8 +1,9 @@
 #ifndef __ZZ_UTILS_H__
 #define __ZZ_UTILS_H__
 
+#include <cstdint>
 #include <stack>
-#include <boost/function.hpp>
+#include <functional>
 
 #define container_of(ptr, type, member) ({ \
 	void* __mptr = (void*)(ptr); \
@@ -14,9 +15,9 @@
 #define ZZ_GUARD_NAME ZZ_CONCAT(__GUARD, __LINE__)
 
 namespace ZzUtils {
-	struct FreeStack : protected std::stack<boost::function<void ()> > {
+	struct FreeStack : protected std::stack<std::function<void ()> > {
 		typedef FreeStack self_t;
-		typedef std::stack<boost::function<void ()> > parent_t;
+		typedef std::stack<std::function<void ()> > parent_t;
 
 		FreeStack();
 		~FreeStack();
@@ -31,7 +32,7 @@ namespace ZzUtils {
 		void Flush();
 	};
 
-	void TestLoop(boost::function<int ()> idle, int64_t dur_num = 1000000LL, int64_t dur_den = 60LL);
+	void TestLoop(std::function<int ()> idle, int64_t dur_num = 1000000LL, int64_t dur_den = 60LL);
 }
 
 #endif // __ZZ_UTILS_H__
