@@ -46,12 +46,13 @@ namespace __01_yuv__ {
 	// |B|                        |y_factor  u_b_factor      0     |   |  V-128  |
 	struct yuv2rgb_t
 	{
-		uint8_t y_shift;
-		int16_t y_factor;
-		int16_t v_r_factor;
-		int16_t u_g_factor;
-		int16_t v_g_factor;
-		int16_t u_b_factor;
+		short y_shift;
+		short y_factor;
+		short v_r_factor;
+		short u_g_factor;
+		short v_g_factor;
+		short u_b_factor;
+		short rgb_shift;
 
 		//double y_shift_f;
 		double y_factor_f;
@@ -61,12 +62,61 @@ namespace __01_yuv__ {
 		double u_b_factor_f;
 
 		yuv2rgb_t();
-		yuv2rgb_t(double kR, double kB, bool bFullRange);
-		void ccvt(int16_t in[3], int16_t out[3]);
+		yuv2rgb_t(double kR, double kB, bool bSrcFullRange, bool bDstFullRange = true);
+		void ccvt(short in[3], short out[3]);
 	};
 
-	template<class T> int16_t V(T v);
-	template<class T> int16_t CLAMP(T v, T _min = 0, T _max = 255);
+	template<class T> short v(T v);
+	template<class T> short clamp(T v, T _min = 0, T _max = 255);
+
+	template<class T> short v(T v) {
+		return (short)((v * PRECISION_FACTOR) + 0.5);
+	}
+
+	template<class T> short clamp(T v, T _min, T _max) {
+		return (short)((v < _min ? _min : v) > _max ? _max : v);
+	}
+
+	inline uint8_t clampU8(int64_t v) {
+		v = (v+128*PRECISION_FACTOR)>>PRECISION;
+
+		return v > 255 ? 255 : v < 0 ? 0 : v;
+	}
+
+	// divide by PRECISION_FACTOR and clamp to [0:255] interval
+	// input must be in the [-128*PRECISION_FACTOR:384*PRECISION_FACTOR] range
+	inline uint8_t clampU8(int32_t v)
+	{
+		static const uint8_t lut[512] =
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,
+		47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,
+		91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,
+		126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,
+		159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,
+		192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,
+		225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,
+		255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+		255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+		255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+		255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255
+		};
+		return lut[(v+128*PRECISION_FACTOR)>>PRECISION];
+	}
+
+	inline uint8_t clampU8(double v) {
+		return v > 255 ? 255 : v < 0 ? 0 : v;
+	}
+
+	inline uint8_t clampU8_1(int32_t v) {
+		v >>= PRECISION;
+		return v > 255 ? 255 : v < 0 ? 0 : v;
+	}
+
+	inline double clampd(double v) {
+		return v < 0 ? 0 : (v > 1 ? 1 : v);
+	}
 
 	void invert_mat3x3(const double * src, double * dst);
 	void vec3_x_mat3x3(double* a, double* b, double* c);
@@ -77,12 +127,14 @@ namespace __01_yuv__ {
 	void ycbcr_limited_range(int a[3], double b[3]);
 	void ycbcr_full_range(int a[3], double b[3]);
 
+#if 0
 	struct ccvt_t {
 		yuv2rgb_t* YUV2RGB[YCBCR_BUTT];
 
 		ccvt_t();
 		~ccvt_t();
 	} ccvt;
+#endif
 
 	struct App {
 		int argc;
@@ -99,12 +151,12 @@ namespace __01_yuv__ {
 	yuv2rgb_t::yuv2rgb_t() {
 	}
 
-	yuv2rgb_t::yuv2rgb_t(double kR, double kB, bool bFullRange) {
+	yuv2rgb_t::yuv2rgb_t(double kR, double kB, bool bSrcFullRange, bool bDstFullRange) {
 		double kG = (1 - kR - kB);
 		double kY;
 		double kU;
 		double kV;
-		if(bFullRange) {
+		if(bSrcFullRange) {
 			kY = 1.0;
 			kU = 0.5;
 			kV = 0.5;
@@ -118,44 +170,47 @@ namespace __01_yuv__ {
 			y_shift = 16;
 		}
 
+		double kRGB;
+		if(bDstFullRange) {
+			kRGB = 1.0;
+
+			rgb_shift = 0;
+		} else {
+			kRGB = (235 - 16) / 255.0;
+
+			rgb_shift = (16 * PRECISION_FACTOR);
+		}
+
 		//yuv2rgb = [
 		//           [1.0 / kY,		0.0 / kU,				(1-kR) / kV],
 		//           [1.0 / kY,		-(1-kB) * kB / kG / kU,	-(1-kR) * kR / kG / kV],
 		//           [1.0 / kY,		(1-kB) / kU,			0.0 / kV],
 		//           ];
 
-		y_factor_f = (1.0 / kY);
-		v_r_factor_f = ((1-kR) / kV);
-		u_g_factor_f = -((1-kB) * kB / kG / kU);
-		v_g_factor_f = -((1-kR) * kR / kG / kV);
-		u_b_factor_f = ((1-kB) / kU);
+		y_factor_f = (kRGB * 1.0 / kY);
+		v_r_factor_f = (kRGB * (1-kR) / kV);
+		u_g_factor_f = -(kRGB * (1-kB) * kB / kG / kU);
+		v_g_factor_f = -(kRGB * (1-kR) * kR / kG / kV);
+		u_b_factor_f = (kRGB * (1-kB) / kU);
 
-		y_factor = V(1.0 / kY);
-		v_r_factor = V((1-kR) / kV);
-		u_g_factor = -V((1-kB) * kB / kG / kU);
-		v_g_factor = -V((1-kR) * kR / kG / kV);
-		u_b_factor = V((1-kB) / kU);
+		y_factor = v(kRGB * 1.0 / kY);
+		v_r_factor = v(kRGB * (1-kR) / kV);
+		u_g_factor = -v(kRGB * (1-kB) * kB / kG / kU);
+		v_g_factor = -v(kRGB * (1-kR) * kR / kG / kV);
+		u_b_factor = v(kRGB * (1-kB) / kU);
 	}
 
 	// |R|                        |y_factor      0       v_r_factor|   |Y-y_shift|
 	// |G| = 1/PRECISION_FACTOR * |y_factor  u_g_factor  v_g_factor| * |  U-128  |
 	// |B|                        |y_factor  u_b_factor      0     |   |  V-128  |
-	void yuv2rgb_t::ccvt(int16_t in[3], int16_t out[3]) {
-		int16_t y_ = in[0] - y_shift;
-		int16_t u_ = in[1] - 128;
-		int16_t v_ = in[2] - 128;
+	void yuv2rgb_t::ccvt(short in[3], short out[3]) {
+		short y_ = in[0] - y_shift;
+		short u_ = in[1] - 128;
+		short v_ = in[2] - 128;
 
-		out[0] = CLAMP((y_factor * y_ + v_r_factor * v_) / PRECISION_FACTOR);
-		out[1] = CLAMP((y_factor * y_ + u_g_factor * u_ + v_g_factor * v_) / PRECISION_FACTOR);
-		out[2] = CLAMP((y_factor * y_ + u_b_factor * u_) / PRECISION_FACTOR);
-	}
-
-	template<class T> int16_t V(T v) {
-		return (int16_t)((v * PRECISION_FACTOR) + 0.5);
-	}
-
-	template<class T> int16_t CLAMP(T v, T _min, T _max) {
-		return (int16_t)((v < _min ? _min : v) > _max ? _max : v);
+		out[0] = clamp((y_factor * y_ + v_r_factor * v_) / PRECISION_FACTOR);
+		out[1] = clamp((y_factor * y_ + u_g_factor * u_ + v_g_factor * v_) / PRECISION_FACTOR);
+		out[2] = clamp((y_factor * y_ + u_b_factor * u_) / PRECISION_FACTOR);
 	}
 
 	void invert_mat3x3(const double * src, double * dst)
@@ -247,6 +302,7 @@ namespace __01_yuv__ {
 		b[2] = a[2] / 255.0;
 	}
 
+#if 0
 	ccvt_t::ccvt_t() {
 		memset(YUV2RGB, 0, sizeof(YUV2RGB));
 
@@ -295,6 +351,7 @@ namespace __01_yuv__ {
 			delete YUV2RGB[i];
 		}
 	}
+#endif
 
 	App::App(int argc, char **argv) : argc(argc), argv(argv) {
 		// LOGD("%s(%d):", __FUNCTION__, __LINE__);
@@ -305,8 +362,9 @@ namespace __01_yuv__ {
 	}
 
 	int App::Run() {
-		int err;
+		int err = 0;
 
+#if 0
 		switch(1) { case 1:
 			int yuv_0[] = {
 				0x3F,
@@ -353,6 +411,90 @@ namespace __01_yuv__ {
 			LOGD("rgb_1_s: %d %d %d", rgb_1_s[0], rgb_1_s[1], rgb_1_s[2]);
 
 			err = 0;
+		}
+#endif
+
+		switch(1) { case 1:
+			double kR, kB;
+
+			// BT 709
+			kR = 0.2126;
+			kB = 0.0722;
+			yuv2rgb_t yuv2rgb(kR, kB, true, true);
+
+			double mat_yuv2rgb_bt709[9] = {
+				yuv2rgb.y_factor_f,                    0, yuv2rgb.v_r_factor_f,
+				yuv2rgb.y_factor_f, yuv2rgb.u_g_factor_f, yuv2rgb.v_g_factor_f,
+				yuv2rgb.y_factor_f, yuv2rgb.u_b_factor_f,                    0,
+			};
+			double mat_rgb2yuv_bt709[9];
+			invert_mat3x3(mat_yuv2rgb_bt709, mat_rgb2yuv_bt709);
+
+			{
+				int pRGB[3] = { 235, 16, 16 };
+				int pYUV[3];
+
+				double rgb[] = {
+					(pRGB[0] - 16) * 255.0 / (235 - 16),
+					(pRGB[1] - 16) * 255.0 / (235 - 16),
+					(pRGB[2] - 16) * 255.0 / (235 - 16)
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]) * (235 - 16) / 255 + 16;
+				pYUV[1] = (int)clampU8(yuv[1] + 128) * (240 - 16) / 255 + 16;
+				pYUV[2] = (int)clampU8(yuv[2] + 128) * (240 - 16) / 255 + 16;
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
+
+			{
+				int pRGB[3] = { 16, 235, 16 };
+				int pYUV[3];
+
+				double rgb[] = {
+					(pRGB[0] - 16) * 255.0 / (235 - 16),
+					(pRGB[1] - 16) * 255.0 / (235 - 16),
+					(pRGB[2] - 16) * 255.0 / (235 - 16)
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]) * (235 - 16) / 255 + 16;
+				pYUV[1] = (int)clampU8(yuv[1] + 128) * (240 - 16) / 255 + 16;
+				pYUV[2] = (int)clampU8(yuv[2] + 128) * (240 - 16) / 255 + 16;
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
+
+			{
+				int pRGB[3] = { 16, 16, 235 };
+				int pYUV[3];
+
+				double rgb[] = {
+					(pRGB[0] - 16) * 255.0 / (235 - 16),
+					(pRGB[1] - 16) * 255.0 / (235 - 16),
+					(pRGB[2] - 16) * 255.0 / (235 - 16)
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]) * (235 - 16) / 255 + 16;
+				pYUV[1] = (int)clampU8(yuv[1] + 128) * (240 - 16) / 255 + 16;
+				pYUV[2] = (int)clampU8(yuv[2] + 128) * (240 - 16) / 255 + 16;
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
 		}
 
 		return err;
