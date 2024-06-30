@@ -495,6 +495,72 @@ namespace __01_yuv__ {
 					pRGB[0], pRGB[1], pRGB[2],
 					pYUV[0], pYUV[1], pYUV[2]);
 			}
+
+			{
+				int pRGB[3] = { 255, 0, 0 };
+				int pYUV[3];
+
+				double rgb[] = {
+					double(pRGB[0]),
+					double(pRGB[1]),
+					double(pRGB[2])
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]);
+				pYUV[1] = (int)clampU8(yuv[1] + 128);
+				pYUV[2] = (int)clampU8(yuv[2] + 128);
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
+
+			{
+				int pRGB[3] = { 0, 255, 0 };
+				int pYUV[3];
+
+				double rgb[] = {
+					double(pRGB[0]),
+					double(pRGB[1]),
+					double(pRGB[2])
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]);
+				pYUV[1] = (int)clampU8(yuv[1] + 128);
+				pYUV[2] = (int)clampU8(yuv[2] + 128);
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
+
+			{
+				int pRGB[3] = { 0, 0, 255 };
+				int pYUV[3];
+
+				double rgb[] = {
+					double(pRGB[0]),
+					double(pRGB[1]),
+					double(pRGB[2])
+				};
+				double yuv[3];
+
+				mat3x3_x_vec3x1(mat_rgb2yuv_bt709, rgb, yuv);
+
+				pYUV[0] = (int)clampU8(yuv[0]);
+				pYUV[1] = (int)clampU8(yuv[1] + 128);
+				pYUV[2] = (int)clampU8(yuv[2] + 128);
+
+				LOGD("rgb(%d, %d, %d) ==> yuv(%d, %d, %d)",
+					pRGB[0], pRGB[1], pRGB[2],
+					pYUV[0], pYUV[1], pYUV[2]);
+			}
 		}
 
 		return err;
